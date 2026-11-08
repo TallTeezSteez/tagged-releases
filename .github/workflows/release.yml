@@ -1,0 +1,51 @@
+name: Release Tagged for Windows
+# Builds the Tagged desktop app and publishes it as a release here. Public repos get free build
+# minutes, so the build runs here instead of in the private tagged repo. No app code lives in this
+# repo: each run fetches only the desktop/ folder from TallTeezSteez/tagged with the Actions secret
+# TAGGED_RELEASES_TOKEN (fine-grained, read access to tagged). Publishing uses this repo's own
+# GITHUB_TOKEN. Start it from Actions -> Release Tagged for Windows -> Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, like 1.0.0'
+        required: true
+      ref:
+        description: 'Branch or commit of TallTeezSteez/tagged to build'
+        required: false
+        default: 'main'
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check the version
+        shell: bash
+        env:
+          V: ${{ inputs.version }}
+        run: '[[ "${V#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a version: $V"; exit 1; }'
+      - uses: actions/checkout@v4
+        with:
+          repository: TallTeezSteez/tagged
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.TAGGED_RELEASES_TOKEN }}
+          sparse-checkout: desktop
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+      - name: Set the version
+        working-directory: desktop
+        shell: bash
+        env:
+          V: ${{ inputs.version }}
+        run: npm version "${V#v}" --no-git-tag-version --allow-same-version
+      - name: Build and publish
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release
