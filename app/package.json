@@ -1,0 +1,58 @@
+{
+  "name": "tagged-desktop",
+  "productName": "Tagged",
+  "version": "1.0.0",
+  "description": "Tagged in its own window: the Updraft (Mocha) look with Window transparency, and automatic updates from tagged-releases.",
+  "main": "main.js",
+  "private": true,
+  "author": "Wyatt Taylor",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "release": "electron-builder --win nsis --x64 --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "com.tallteezsteez.tagged",
+    "productName": "Tagged",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "offline.html",
+      "icon.png"
+    ],
+    "win": {
+      "icon": "icon.png",
+      "target": "nsis",
+      "artifactName": "Tagged-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Tagged"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "TallTeezSteez",
+        "repo": "tagged-releases",
+        "releaseType": "release"
+      }
+    ],
+    "releaseInfo": {
+      "releaseNotes": "Tagged for Windows.\n\n**Download:** the Tagged-Setup .exe file below, under Assets.\n\n**First time you open it:** Windows may show \"Windows protected your PC\" because the app isn't signed. Click **More info**, then **Run anyway**. You only need to do this once; updates install by themselves after that.\n\nTagged is private: only invited accounts can sign in."
+    }
+  }
+}

@@ -6,4 +6,4 @@ Downloads for the Tagged desktop app. Tagged is a private app: only invited acco
 
 **First time you open it:** Windows may show "Windows protected your PC" because the app isn't signed. Click **More info**, then **Run anyway**. You only need to do this once; updates install by themselves after that.
 
-This repo holds no app code. The releases are built by the workflow in `.github/workflows/`.
+The `app/` folder is the small window around the live site that the installer is built from. The Tagged app itself isn't here.
