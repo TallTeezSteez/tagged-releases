@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld('taggedDesktop', {
   version: ipcRenderer.sendSync('app-version'),
   theme: (dark) => ipcRenderer.send('theme', !!dark),
   glass: (percent) => ipcRenderer.send('glass', Number(percent) || 0),
+  titlebar: (color, symbol) => ipcRenderer.send('titlebar', String(color || ''), String(symbol || '')),
   retry: () => ipcRenderer.send('retry'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   getAutoUpdate: () => ipcRenderer.invoke('get-auto-update'),

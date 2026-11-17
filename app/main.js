@@ -15,6 +15,12 @@ const OPEN_OUTSIDE = new Set(['http:', 'https:', 'mailto:', 'tel:', 'obsidian:',
 const MANTLE = '#181825';
 const TRANSPARENCY_MAX = 40;
 const WEEK = 7 * 24 * 60 * 60 * 1000;
+// Our own title bar (2026-11-16, Wyatt's pick): Windows' frame is hidden and only the close,
+// minimize and maximize buttons are drawn, in the look's colors, over the page's top strip (the
+// window's ground, so the bar disappears). The page leaves this much room at the top and lets
+// you drag the window by it (env(titlebar-area-height) there).
+const TITLEBAR_HEIGHT = 32;
+const MOCHA_TEXT = '#CDD6F4';
 
 let win = null;
 
@@ -70,7 +76,9 @@ function createWindow() {
     show: false,
     backgroundColor: MANTLE,
     backgroundMaterial: 'none',
-    ...(mac ? { visualEffectState: 'active' } : {}),
+    ...(mac
+      ? { visualEffectState: 'active' }
+      : { titleBarStyle: 'hidden', titleBarOverlay: { color: MANTLE, symbolColor: MOCHA_TEXT, height: TITLEBAR_HEIGHT } }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
   });
   win.setMenu(null);
@@ -134,6 +142,16 @@ ipcMain.on('theme', (_event, dark) => {
   nativeTheme.themeSource = dark ? 'dark' : 'light';
 });
 ipcMain.on('glass', (_event, percent) => applyGlass(percent));
+// The title bar's color (the look's ground, or see-through with Window transparency) and its
+// buttons' color (the look's ink). Sent by the page whenever the look or the glass changes.
+ipcMain.on('titlebar', (_event, color, symbol) => {
+  if (!win || win.isDestroyed() || process.platform === 'darwin') return;
+  try {
+    win.setTitleBarOverlay({ color: String(color || MANTLE), symbolColor: String(symbol || MOCHA_TEXT), height: TITLEBAR_HEIGHT });
+  } catch (err) {
+    console.warn(`[tagged] title bar colors unavailable: ${err && err.message}`);
+  }
+});
 ipcMain.on('retry', () => win && win.loadURL(SITE));
 ipcMain.handle('check-for-updates', () => checkForUpdates());
 ipcMain.handle('get-auto-update', () => readSettings().autoUpdate);
