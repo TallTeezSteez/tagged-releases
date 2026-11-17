@@ -1,38 +1,96 @@
-name: Release Tagged for Windows
-# Builds the Tagged desktop app (the app/ folder: the small window around the live site, no Tagged
-# app code) and publishes it as a release in this repo with the repo's own GITHUB_TOKEN. Public
-# repos get free build minutes. Start it from Actions -> Release Tagged for Windows -> Run workflow.
+name: Release
+# THE ONE WAY TO PUT OUT A NEW Tagged (same steps for every app):
+#   GitHub > TallTeezSteez/tagged-releases > Actions > Release > Run workflow.
+#   Version: leave blank for the next number (1.0.4 -> 1.0.5). What's new: optional.
+# It builds on GitHub's free Windows machine (free because this repo is public), then publishes one full release with:
+#   Tagged-Setup.exe        same name every time, so this link never changes:
+#                            https://github.com/TallTeezSteez/tagged-releases/releases/latest/download/Tagged-Setup.exe
+#   latest.yml + .blockmap   what installed copies read to update themselves
+# The desktop app code is the app/ folder of this repo (just the window around the live site; no Tagged app code).
+# Standard set 16 Nov 2026 (Wyatt: "all set up the same").
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish, like 1.0.1 (higher than the last release)'
-        required: true
+        description: 'Version, like 1.2.3 (blank = the next number)'
+        required: false
+        default: ''
+      notes:
+        description: "What's new (optional, shows on the download page)"
+        required: false
+        default: ''
+
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  APP: Tagged
+
 jobs:
-  windows:
+  release:
     runs-on: windows-latest
+    timeout-minutes: 45
     defaults:
       run:
-        working-directory: app
         shell: bash
     steps:
-      - name: Check the version
+      - name: Pick the version
         env:
+          GH_TOKEN: ${{ github.token }}
           V: ${{ inputs.version }}
-        run: '[[ "${V#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Not a version: $V"; exit 1; }'
-        working-directory: .
+        run: |
+          V="${V// /}"; V="${V#v}"
+          if [ -z "$V" ]; then
+            last=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' | sed -n 's/^v\([0-9]*\.[0-9]*\.[0-9]*\)$/\1/p' | sort -V | tail -1)
+            if [ -z "$last" ]; then V=1.0.0; else IFS=. read -r a b c <<< "$last"; V="$a.$b.$((c + 1))"; fi
+          fi
+          [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Not a version: $V (use something like 1.2.3)"; exit 1; }
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$V" >/dev/null 2>&1; then echo "::error::v$V is already released. Leave the version blank, or pick a higher one."; exit 1; fi
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+          echo "Releasing $APP $V"
+
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci --no-audit --no-fund
-      - name: Set the version
+
+      - name: Build
+        working-directory: app
+        run: |
+          npm ci --no-audit --no-fund
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          # Same file name every release, and updates come from this repo (whatever it's called).
+          node -e '
+            const fs = require("fs"); const f = process.argv[1]; const j = JSON.parse(fs.readFileSync(f, "utf8"));
+            const c = j.build;
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split("/");
+            c.win.artifactName = process.env.APP + "-Setup.${ext}";
+            c.publish = [{ provider: "github", owner, repo, releaseType: "release" }];
+            fs.writeFileSync(f, JSON.stringify(j, null, 2));' package.json
+          npx electron-builder --win nsis --x64 --publish never 
+
+      - name: Publish
         env:
-          V: ${{ inputs.version }}
-        run: npm version "${V#v}" --no-git-tag-version --allow-same-version
-      - name: Build and publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run release
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          out="app/release"
+          ls -la "$out"
+          files=("$out/$APP-Setup.exe" "$out/$APP-Setup.exe.blockmap" "$out/latest.yml")
+          for f in "${files[@]}"; do [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }; done
+          {
+            echo "$APP $VERSION for Windows."
+            if [ -n "${NOTES// /}" ]; then echo; echo "**What's new:** $NOTES"; fi
+            echo
+            echo "**Download:** $APP-Setup.exe below, under Assets."
+            echo
+            echo "**First time you open it:** Windows may show \"Windows protected your PC\" because the app isn't signed. Click **More info**, then **Run anyway**. You only do this once; after that $APP updates itself."
+          } > notes.md
+          gh release create "v$VERSION" "${files[@]}" --repo "$GITHUB_REPOSITORY" --target main \
+            --title "$APP $VERSION" --notes-file notes.md --latest
+          echo "Live: https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$APP-Setup.exe"
