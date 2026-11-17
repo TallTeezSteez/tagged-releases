@@ -53,6 +53,8 @@ function openOutside(url) {
 function applyGlass(percent) {
   if (!win || win.isDestroyed()) return;
   const transparent = Math.max(0, Math.min(TRANSPARENCY_MAX, Number(percent) || 0)) > 0;
+  // Remembered so the next launch opens with the glass already on (see createWindow).
+  if (readSettings().glass !== transparent) writeSettings({ glass: transparent });
   try {
     if (process.platform === 'darwin') win.setVibrancy(transparent ? 'under-window' : null);
     else win.setBackgroundMaterial(transparent ? 'acrylic' : 'none');
@@ -64,8 +66,11 @@ function applyGlass(percent) {
 
 function createWindow() {
   const mac = process.platform === 'darwin';
-  // Mocha is the default look, so start the window dark and solid; the page turns glass on.
+  // Mocha is the default look, so start the window dark. Like Updraft, the window is made with the
+  // glass already on when it was on last time (or on a first launch, since the page starts at 40%):
+  // some Windows 11 PCs ignore acrylic switched on after the window exists (Wyatt's work PC, 2026-11-17).
   nativeTheme.themeSource = 'dark';
+  const glass = !mac && readSettings().glass !== false;
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -74,11 +79,11 @@ function createWindow() {
     title: 'Tagged',
     icon: path.join(__dirname, 'icon.png'),
     show: false,
-    backgroundColor: MANTLE,
-    backgroundMaterial: 'none',
+    backgroundColor: glass ? '#00000000' : MANTLE,
+    backgroundMaterial: glass ? 'acrylic' : 'none',
     ...(mac
       ? { visualEffectState: 'active' }
-      : { titleBarStyle: 'hidden', titleBarOverlay: { color: MANTLE, symbolColor: MOCHA_TEXT, height: TITLEBAR_HEIGHT } }),
+      : { titleBarStyle: 'hidden', titleBarOverlay: { color: glass ? '#00000000' : MANTLE, symbolColor: MOCHA_TEXT, height: TITLEBAR_HEIGHT } }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
   });
   win.setMenu(null);
