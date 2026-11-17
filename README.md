@@ -14,7 +14,7 @@ These links always get the newest version. Older versions: [all releases](https:
 
 Tagged updates itself after that.
 
-More about Tagged, with screenshots: https://draftline-gules.vercel.app/tagged
+More about Tagged, with screenshots: https://draftlineapps.com/tagged
 
 The `app/` folder is the small window around the live site that the installer is built from. The Tagged app itself isn't here.
 
